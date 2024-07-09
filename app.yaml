@@ -16,4 +16,4 @@ models:
     description: Style of one of Picasso's abstract paintings
 
 images:
-  max_size: 300000
+  max_size: 200000

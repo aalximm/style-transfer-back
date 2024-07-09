@@ -11,11 +11,14 @@ from flaskr.image_generator.ImageConverter import image_to_normalized_array, nor
 
 class StylerService:
 	def __init__(self, app):
-		self.models: Dict[str, Dict[str, Union[InferenceSession, str]]] = {}
+		self.models: Dict[str, Dict[str, Union[Callable[[], InferenceSession], str]]] = {}
 
 		for model_data in app.config["models"]:
+			def get_session(model_path=model_data["model_path"]):
+				return onnxruntime.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+
 			self.models[model_data["key"]] = {
-				"model": onnxruntime.InferenceSession(model_data["model_path"], providers=["CPUExecutionProvider"]),
+				"model": get_session,
 				"description": model_data["description"],
 				"name": model_data["name"],
 				"image_name": model_data["image_name"]
@@ -38,15 +41,17 @@ class StylerService:
 			raise KeyError
 
 		image_array = image_to_normalized_array(image)
+		del image
+
 		image_array = np.expand_dims(image_array, axis=0)
 
-		session = self.models[style]["model"]
+		session = self.models[style]["model"]()
 		model_inputs = {
 			session.get_inputs()[0].name: image_array
 		}
 
-		output_image = session.run(["result"], model_inputs)
-		output_image = output_image[0]
+		output_image = session.run(["result"], model_inputs)[0]
+		del image_array, session
 
 		output_image = normalized_array_to_image(output_image)
 

@@ -38,6 +38,8 @@ def create_app():
 		styles = styler.get_styles()
 		response = make_response(styles)
 
+		del styles
+
 		return response, 200
 
 	@app.post("/image-styler/forward/upload")
@@ -49,15 +51,18 @@ def create_app():
 		style_key = request.form.get("style")
 
 		image = ImageConverter.bytes_to_image(content_image_bytes)
+		del content_image_bytes
 
 		max_size = app.config["images"]["max_size"]
 		image = ImageConverter.reduce_quality(image, max_size)
 
 		generated_image = await styler.style_image(image, style_key)
-		# generated_image = image
-		generated_image_bytes = ImageConverter.image_to_bytes(generated_image)
-		response = make_response(generated_image_bytes)
+		del image
 
+		generated_image_bytes = ImageConverter.image_to_bytes(generated_image)
+		del generated_image
+
+		response = make_response(generated_image_bytes)
 		response.headers.set('Content-Type', 'image/jpeg')
 
 		return response, 200
