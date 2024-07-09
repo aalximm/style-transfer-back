@@ -1,43 +1,69 @@
 import os
-import uuid
 
-from flask import Flask, request, g, make_response
+import yaml
+from flask import Flask, request, make_response
+from flask_cors import CORS
+
+from flaskr.image_generator.ImageConverter import reduce_quality
+from flaskr.image_generator.StylerService import StylerService
 
 STYLE_FILE_KEY = 'style'
 CONTENT_FILE_KEY = 'content'
 
-image_generator_instance = None
+
+styler: StylerService = None
 
 
 def create_app():
-	global image_generator_instance
-	from .image_generator import ImageGenerator
+	global styler
+	from .image_generator.StylerService import StylerService
+
+	static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "static")
 	# create and configure the app
-	app = Flask(__name__)
+	app = Flask(__name__, static_folder=static_folder)
 
-	if image_generator_instance is None:
-		image_generator_instance = ImageGenerator.ImageGenerator()
+	with open(os.path.join('app.yaml')) as config_file:
+		config = yaml.safe_load(config_file)
 
-	@app.post("/image-generator/upload")
-	async def upload_images():
-		global image_generator_instance
-		from .image_generator import ImageProcessor
+	app.config.update(config)
 
-		if STYLE_FILE_KEY not in request.files or CONTENT_FILE_KEY not in request.files:
-			return "No file part", 400
+	CORS(app)
 
-		# session_id = str(uuid.uuid4())
+	if styler is None:
+		styler = StylerService(app)
 
-		style_image = request.files[STYLE_FILE_KEY].read()
-		content_image = request.files[CONTENT_FILE_KEY].read()
-		# style_image.save(os.path.join('uploads', 'style', f"{session_id}.jpg"))
-		# content_image.save(os.path.join('uploads', 'content', f"{session_id}.jpg"))
+	@app.get("/image-styler/styles")
+	def get_styles():
+		global styler
+		styles = styler.get_styles()
+		response = make_response(styles)
 
-		generated_image = image_generator_instance.generate_image(content_image, style_image)
+		return response, 200
 
-		response = make_response(generated_image)
+	@app.post("/image-styler/forward/upload")
+	async def upload_image():
+		global styler
+		from .image_generator import ImageConverter
+
+		content_image_bytes = request.files['content'].read()
+		style_key = request.form.get("style")
+
+		image = ImageConverter.bytes_to_image(content_image_bytes)
+
+		max_size = app.config["images"]["max_size"]
+		image = ImageConverter.reduce_quality(image, max_size)
+
+		generated_image = await styler.style_image(image, style_key)
+		# generated_image = image
+		generated_image_bytes = ImageConverter.image_to_bytes(generated_image)
+		response = make_response(generated_image_bytes)
+
 		response.headers.set('Content-Type', 'image/jpeg')
 
 		return response, 200
 
 	return app
+
+
+if __name__ == "__main__":
+	create_app()

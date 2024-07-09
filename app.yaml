@@ -1,0 +1,19 @@
+models:
+  - key: van_gogh
+    name: Van Gogh
+    model_path: assets/stylemodels/van_gogh_model.onnx
+    image_name: images/van_gogh.jpg
+    description: Style of the Van Gogh's Starry Night
+  - key: kandinsky
+    name: Kandinsky
+    model_path: assets/stylemodels/kandinsky_model.onnx
+    image_name: images/kandinsky.jpg
+    description: Style of Kandynsky's paintings
+  - key: picasso
+    name: Pablo Picasso
+    model_path: assets/stylemodels/picasso_model.onnx
+    image_name: images/picasso.jpg
+    description: Style of one of Picasso's abstract paintings
+
+images:
+  max_size: 600000
