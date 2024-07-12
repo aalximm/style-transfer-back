@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["sh", "-c",  "celery -A celery_worker worker --loglevel=info -P eventlet --uid=nobody & waitress-serve --port=8000 --call flaskr:create_app"]
+CMD ["sh", "-c",  "celery -A celery_worker worker --loglevel=info -P eventlet --uid=nobody --concurrency=2 --max-memory-per-child=20000 & waitress-serve --port=8000 --call flaskr:create_app"]
