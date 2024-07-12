@@ -1,8 +1,10 @@
 from typing import Dict, Union, Callable
 
+import PIL.Image
 import numpy as np
 import onnxruntime
 from PIL.Image import Image
+from celery import shared_task
 from flask import url_for
 from onnxruntime import InferenceSession
 
@@ -36,7 +38,7 @@ class StylerService:
 			for name in self.models.keys()
 		]
 
-	async def style_image(self, image: Image, style: str) -> Image:
+	def style_image(self, image: Image, style: str) -> Image:
 		if style not in self.models.keys():
 			raise KeyError
 
