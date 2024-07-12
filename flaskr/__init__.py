@@ -55,8 +55,7 @@ def create_app():
 			broker_connection_retry_on_startup=True,
 			worker_cancel_long_running_tasks_on_connection_loss=False,
 			result_expires=timedelta(minutes=5),
-			redis_max_connections=2,
-			redis_socket_keepalive=True,
+			redis_max_connections=10,
 		),
 	)
 
