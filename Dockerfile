@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["waitress-serve", "--port=8000", "--call", "flaskr:create_app"]
+CMD ["waitress-serve", "--port=8000", "--call", "flaskr:create_app", "&", "celery, "-A", "celery_worker", "worker", "--loglevel=info"]
