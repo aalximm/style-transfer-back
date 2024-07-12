@@ -40,10 +40,11 @@ def create_app():
 		config = yaml.safe_load(config_file)
 
 	app.config.update(config)
+	app.config.from_prefixed_env()
 	app.config.from_mapping(
 		CELERY=dict(
-			broker_url="redis://localhost:6379",
-			result_backend="redis://localhost:6379",
+			broker_url=os.getenv("CELERY_BROKER_URL", "redis://localhost:6379"),
+			result_backend=os.getenv("CELERY_BACKEND_URL", "redis://localhost:6379"),
 			task_ignore_result=True,
 			broker_connection_retry_on_startup=True
 		),
