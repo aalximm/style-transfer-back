@@ -1,9 +1,12 @@
+import logging
 import os
+from datetime import timedelta
 
 import yaml
 from celery import Celery, Task, shared_task
 from celery.result import AsyncResult
 from flask import Flask, request, make_response, Response
+from flask.logging import default_handler
 from flask_cors import CORS
 
 from flaskr.image_generator.ImageConverter import reduce_quality
@@ -28,33 +31,49 @@ def celery_init_app(app: Flask) -> Celery:
 	return celery_app_local
 
 
+# create and configure the app
 def create_app():
 	global styler
 	from .image_generator.StylerService import StylerService
 
 	static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "static")
-	# create and configure the app
 	app = Flask(__name__, static_folder=static_folder)
 
+	# configs
 	with open(os.path.join('app.yaml')) as config_file:
 		config = yaml.safe_load(config_file)
 
 	app.config.update(config)
 	app.config.from_prefixed_env()
+
+	# celery config
 	app.config.from_mapping(
 		CELERY=dict(
 			broker_url=os.getenv("CELERY_BROKER_URL", "redis://localhost:6379"),
 			result_backend=os.getenv("CELERY_BACKEND_URL", "redis://localhost:6379"),
 			task_ignore_result=True,
-			broker_connection_retry_on_startup=True
+			broker_connection_retry_on_startup=True,
+			worker_cancel_long_running_tasks_on_connection_loss=False,
+			result_expires=timedelta(minutes=5),
+			redis_max_connections=2,
+			redis_socket_keepalive=True,
 		),
 	)
 
+	# enable CORS
 	CORS(app)
 
+	# setup styler
 	if styler is None:
 		styler = StylerService(app)
 
+	# setup waitress logger
+	logger = logging.getLogger('waitress')
+	logger.addHandler(default_handler)
+	app.logger.addHandler(default_handler)
+	app.logger.setLevel(logging.INFO)
+
+	# init celery app
 	celery_init_app(app)
 
 	@app.get("/image-styler/styles")
@@ -75,6 +94,8 @@ def create_app():
 		max_size = app.config["images"]["max_size"]
 		task = style_image_task.delay(content_image_bytes, style_key, max_size)
 
+		app.logger.info(f"/image-styler/upload: task {task.id} was sent in the queue")
+
 		return {"task_id": task.id}, 200
 
 	@app.get("/image-styler/result/<task_id>")
@@ -86,6 +107,7 @@ def create_app():
 
 		if result.status == 'FAILURE':
 			result.forget()
+			app.logger.error(f"/image-styler/result: task {task_id} finished with status FAILURE")
 			return Response(status=500)
 
 		generated_image_bytes = result.result
@@ -93,6 +115,8 @@ def create_app():
 
 		response = make_response(generated_image_bytes)
 		response.headers.set('Content-Type', 'image/jpeg')
+
+		app.logger.info(f"/image-styler/result: got the result from task {task_id} and sent it to user")
 
 		return response
 
@@ -116,6 +140,7 @@ def style_image_task(content_image_bytes: bytes, style_key: str, max_size: int) 
 	del generated_image
 
 	return generated_image_bytes
+
 
 if __name__ == "__main__":
 	flask_app = create_app()
