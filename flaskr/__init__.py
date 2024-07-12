@@ -56,6 +56,8 @@ def create_app():
 			worker_cancel_long_running_tasks_on_connection_loss=False,
 			result_expires=timedelta(minutes=5),
 			redis_max_connections=10,
+			redis_socket_keepalive=True,
+			redis_socket_timeout=30
 		),
 	)
 
