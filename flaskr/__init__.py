@@ -9,6 +9,7 @@ from flask import Flask, request, make_response, Response
 from flask.logging import default_handler
 from flask_cors import CORS
 
+from flaskr.image_generator import ImageConverter
 from flaskr.image_generator.ImageConverter import reduce_quality
 from flaskr.image_generator.StylerService import StylerService
 
@@ -53,9 +54,13 @@ def create_app():
 			result_backend=os.getenv("CELERY_BACKEND_URL", "redis://localhost:6379"),
 			task_ignore_result=True,
 			broker_connection_retry_on_startup=True,
+			broker_pool_limit=5,
+			worker_prefetch_multiplier=1,
+			worker_max_tasks_per_child=1,
+			worker_max_memory_per_child=20000,
 			worker_cancel_long_running_tasks_on_connection_loss=False,
-			result_expires=timedelta(minutes=5),
-			redis_max_connections=10,
+			result_expires=timedelta(minutes=1),
+			redis_max_connections=5,
 			redis_socket_keepalive=True,
 			redis_socket_timeout=30
 		),
@@ -93,7 +98,12 @@ def create_app():
 		style_key = request.form.get("style")
 
 		max_size = app.config["images"]["max_size"]
-		task = style_image_task.delay(content_image_bytes, style_key, max_size)
+
+		image = ImageConverter.bytes_to_image(content_image_bytes)
+		image = ImageConverter.reduce_quality(image, max_size)
+		content_image_bytes = ImageConverter.image_to_bytes(image)
+
+		task = style_image_task.delay(content_image_bytes, style_key)
 
 		app.logger.info(f"/image-styler/upload: task {task.id} was sent in the queue")
 
@@ -125,14 +135,12 @@ def create_app():
 
 
 @shared_task(ignore_result=False)
-def style_image_task(content_image_bytes: bytes, style_key: str, max_size: int) -> bytes:
+def style_image_task(content_image_bytes: bytes, style_key: str) -> bytes:
 	from .image_generator import ImageConverter
 	global styler
 
 	image = ImageConverter.bytes_to_image(content_image_bytes)
 	del content_image_bytes
-
-	image = ImageConverter.reduce_quality(image, max_size)
 
 	generated_image = styler.style_image(image, style_key)
 	del image
