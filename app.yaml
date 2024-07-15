@@ -14,6 +14,16 @@ models:
     model_path: assets/stylemodels/picasso_model.onnx
     image_name: images/picasso.jpg
     description: Style of one of Picasso's abstract paintings
+  - key: color_fluids
+    name: Color Fluids
+    model_path: assets/stylemodels/color_fluids_model.onnx
+    image_name: images/color_fluids.jpg
+    description: Colorful and smooth stream of art
+  - key: ink_drawing
+    name: Ink Drawing
+    model_path: assets/stylemodels/ink_drawing_model.onnx
+    image_name: images/ink_drowing.jpg
+    description: Style of WB ink drawing
 
 images:
   max_size: 200000
